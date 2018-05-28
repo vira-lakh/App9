@@ -1,0 +1,273 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+	 <meta charset="utf-8">
+	 <title>Color Analysis</title>
+	 <meta name="viewport" content="width=device-width, initial-scale=.7">
+	 <meta name="apple-mobile-web-app-capable" content="yes">
+	 <link rel="stylesheet" href="https://code.jquery.com/mobile/1.3.2/jquery.mobile-1.3.2.min.css" />
+	 <script src="https://code.jquery.com/jquery-1.9.1.min.js"></script>
+	 <script src="https://code.jquery.com/mobile/1.3.2/jquery.mobile-1.3.2.min.js"></script>
+
+	 <script>
+	 var img;
+	 var docMod = document.lastModified; // gets last modified date and time of the index.html file
+	 console.log("This file last modified " + docMod); // displays last modified date and time in the javascipt browser console
+
+	/* detectVerticalSquash & drawImageIOSFix = are functions that are critical due to a flaw in the iPhone camera software that squishes any photos displayed on an HTML5 canvas element. https://github.com/stomita/ios-imagefile-megapixel
+	*/
+	 function detectVerticalSquash(img) {
+	 var iw = img.naturalWidth, ih = img.naturalHeight;
+	 var canvas = document.createElement('canvas');
+	 canvas.width = 1;
+	 canvas.height = ih;
+	 var ctx = canvas.getContext('2d');
+	 ctx.drawImage(img, 0, 0);
+	 var data = ctx.getImageData(0, 0, 1, ih).data;
+	 var sy = 0;
+	 var ey = ih;
+	 var py = ih;
+	 while (py > sy) {
+	 var alpha = data[(py - 1) * 4 + 3];
+	 if (alpha === 0) {
+	 ey = py;
+	 }
+	 else {
+	 sy = py;
+	 }
+	 py = (ey + sy) >> 1;
+	 }
+	 var ratio = (py / ih);
+	 return (ratio===0)?1:ratio;
+	 }
+
+	 function drawImageIOSFix(ctx, img, sx, sy, sw, sh, dx, dy, dw, dh) {
+	 var vertSquashRatio = detectVerticalSquash(img);
+	 ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh / vertSquashRatio);
+	 }
+
+	/* window.onload necessary to keep javascripts from running before the app gets a chance to load entirely. */
+	 window.onload = function() {
+	 var fileInput = document.getElementById('fileInput');
+	 var messageDisplayArea = document.getElementById('messageDisplayArea');
+	 /* fileInput.addEventListener looks for any change in the <input> tag indicating that the user has selected a file (picture). */
+	 fileInput.addEventListener('change', function(e) {
+	 var file = fileInput.files[0];
+	 var imageType = /image.*/;
+	 /* if (file.type.match(imageType)) checks that the selected file is indeed an image. */
+	 if (file.type.match(imageType)) {
+	 /* new FileReader(); and reader.onload start some kind of file reading process in javaScript. I do not understand why this is necessary although it may simply slow things down to let the image load. */
+	 var reader = new FileReader();
+	 reader.onload = function(e) {
+	 /* messageDisplayArea.innerHTML not needed but allows you to send a message at this point in the program. */
+	 messageDisplayArea.innerHTML = "You picked an image!";
+	 /* new Image() and img.onload start some kind of new image creation process in javaScript. I do not understand why this is necessary although it may simply slow things down to let the image load. */
+	 img = new Image();
+	 img.onload = function() {
+	 /*This finally draws the image onto the first drawing canvas. The specific canvas is referred to by "context". This is established down in the HTML part of the file just under the first <canvas> tag. If we weren't worried about fixing an iPhone bug we would use context.drawImage(image, 0, 0, img.naturalWidth, img.naturalHeight, 0, 0, 600, 500) instead of drawImageIOSFix */
+
+	 drawImageIOSFix(context,img, 0, 0, img.naturalWidth, img.naturalHeight, 0, 0, 600, 500);
+   
+	 // pulls the RGB image data from point (0,0) on the canvas and spans image's width and height
+	 var imageData = context.getImageData(0, 0, img.width, img.height);
+	 // defines array of points from imageData
+	 var data = imageData.data;
+
+	 // for loop that goes through image data for every pixel (R,G,B,alpha) in data
+	 for (var i = 0, n = data.length; i < n; i += 4)
+	 {
+	 // sets red value in pixel data to 0
+	 data[i] = 0;
+	 // sets green value in pixel data to 0
+	 data[i + 1] = 0;
+	 }
+
+	 // puts new image data from the above for loop onto second canvas starting from point (0,0)
+	 context2.putImageData(imageData, 0, 0);
+
+
+	 } // end of img.onload
+
+	 img.src = reader.result;
+	 } // end of reader.onload
+
+	 reader.readAsDataURL(file);
+	 } // end of the if statement checking that file is an image
+	 else
+	 {
+	 // this is what happens if the orignial file selected is not an image file
+	 messageDisplayArea.innerHTML = "File not supported!"
+	 } // end of the else statement if file in NOT an image
+	 }); // end of the fileInput.addEventListener function
+	 } // end of the window.onload function
+
+	//creates array named coords for storing coordinates of ROIs
+	var coords = [];
+
+	//Function that resets canvas with original image and erases any rectangles drawn
+	function reset()
+	{
+	 //same code from line 102 that reuploads image onto canvas
+	 drawImageIOSFix(context,img, 0, 0, img.naturalWidth, img.naturalHeight, 0, 0, 600, 500);
+	 //resets coords array
+	 coords = [];
+	}
+
+	//Creates drawing function for when user touches canvas
+	function draw() {
+	//if statement for when context is called
+	 if (canvas.getContext) {
+	 //following code only happens if there are >2 rectangles on the canvas
+	 if (coords.length<4){
+	 //defines touch variable to make the following code a little simpler
+	 var touch = event.touches[0];
+	 //Fixes the value of pageX off set by the page scroll
+	 var touchX = touch.pageX-touch.target.offsetLeft;
+	 //Fixes value of pageY. Now rectangles on the canvas appear on the touch target
+	 var touchY = touch.pageY-touch.target.offsetTop;
+	 //Changes color of rectangle border
+	 context.strokeStyle="#FF0000";
+	 //Changes width of rectangle border
+	 context.lineWidth=3;
+	 //Draws 250x300 rectangle outline so that top left corner is where user touches
+	 context.strokeRect(touchX, touchY, 150, 200);
+	 //Adds touchX and touchY to array coords
+	 coords.push(touchX,touchY);
+	 }
+	 //following alert pops up if there are already 2 rectangles on the canvas, prevents user from adding more
+	 else{
+	 alert("Too many rectangles! Press the reset button to start over.");
+	 }
+	 }
+	}
+
+	//analysis and output of RGB data
+	function analyze() {
+	 //following code gets the image data from both rectangles and puts them into separate arrays
+	 var imgData = context.getImageData(coords[0]+3,coords[1]+3, 150, 200);
+	 var data = imgData.data;
+	 var imgData2 = context.getImageData(coords[2]+3,coords[3]+3,150,200);
+	 var data2 = imgData2.data;
+
+	 //following code calculates percentages for each red, green, blue value in the first ROI
+	 //rgbTotal is the variable for r+g+b = 225
+	 var rgbTotal = data[0]+data[1]+data[2];
+	 //calculates percentage of red in ROI (red/225)*100
+	 var redPerc = (data[0]/rgbTotal)*100;
+	 //fixes the value above to 1 decimal point
+	 var redFix = redPerc.toFixed(1);
+	 var greenPerc = (data[1]/rgbTotal)*100;
+	 var greenFix = greenPerc.toFixed(1);
+	 var bluePerc = (data[2]/rgbTotal)*100;
+	 var blueFix = bluePerc.toFixed(1);
+
+	 //same as the above segment but for the second ROI
+	 var rgbTotal2 = data[4]+data[5]+data[6];
+	 var redPerc2 = (data[4]/rgbTotal2)*100;
+	 var redFix2 = redPerc2.toFixed(1);
+	 var greenPerc2 = (data[5]/rgbTotal2)*100;
+	 var greenFix2 = greenPerc2.toFixed(1);
+	 var bluePerc2 = (data[6]/rgbTotal2)*100;
+	 var blueFix2 = bluePerc2.toFixed(1);
+
+	 //greenTube will name the tube that has the highest green percentage
+	 var greenTube;
+	 //outputs Tube 1 if first ROI has more green than the second
+	 if (greenPerc>greenPerc2) {
+	 greenTube = "Tube 1";
+	 }
+	 //outputs Tube 2 if second ROI has more green
+	 else if (greenPerc<greenPerc2) {
+	 greenTube = "Tube 2";
+	 }
+	 //outputs Neither tube if green values for both ROIs is the same
+	 else {
+	 greenTube = "Neither tube";
+	 }
+
+	 //grabs paragraph 'results' from DOM
+	 var resultText=document.getElementById("results");
+	 //inputs a table with the percentage results in the paragraph
+	 resultText.innerHTML = "<table><caption><b>"+greenTube+"</b> has the highest green content!</caption><tr><th colspan=3>Tube 1</th><th colspan=3>Tube 2</th></tr><tr><td>Red</td><td>Green</td><td>Blue</td><td>Red</td><td>Green</td><td>Blue</td></tr><tr><td>"+redFix+"%</td><td>"+greenFix+"%</td><td>"+blueFix+"%</td><td>"+redFix2+"%</td><td>"+greenFix2+"%</td><td>"+blueFix2+"%</td></tr></table>";
+	}
+
+	 </script>
+
+	 <style>
+
+	 table {
+	 margin: 0px auto;
+	 }
+
+	 table, th, td {
+	 border: 1px solid black;
+	 border-collapse: collapse;
+	 }
+
+	 th, td {
+	 padding: 5px;
+	 }
+
+	 </style>
+
+	 </head>
+
+	 <body>
+	 <div data-role="page">
+	 <div data-role="header">
+	 <h1>Color Analysis</h1></div><!-- /header -->
+	 <div data-role="content">
+	 Welcome to the PCR Image Analysis website for DIY Diagnostics!<br>
+	 The process can be completed in a few simple steps:<br>
+	 <ol> <!-- begins ordered (number) list -->
+	 <!-- <li> begins a new item in the list -->
+	 <li>Upload an image of the PCR tubes you would like to analyze (over a white background)</li>
+	 <li>Tap the upper left hand corner of each PCR tube so that the red rectangle is surrounding them</li>
+	 <li>If you want to reposition your rectangles, press the "Reset" button at the bottom of the page</li>
+	 <li>Press the "Analyze" button when you are satisfied with how your rectangles are placed</li>
+	 <li>Get your results!</li>
+	 </ol> <!-- end of list -->
+
+	 Press the button bellow to continue:
+	 <a href="#page2" data-role="button">Continue</a>
+
+	 <i>*Note: must be on a mobile device</i>
+	 </div><!-- /content -->
+	 </div><!-- /page -->
+
+
+	 <div data-role="page" id="page2">
+	 <div data-role="header">
+	 <h1>Color Analysis</h1></h1></div><!-- /header -->
+	 <div data-role="content">
+	 <h2>Push button to take picture.</h2>
+	 <div>
+	 Press orange button to create or choose image file:
+	 <input type="file" id="fileInput" STYLE="background-color: #FF6600;">
+	 </div>
+	 <div id="messageDisplayArea"></div>
+
+	 <canvas id="myCanvas" width=600 height=500 style="border:1px solid #d3d3d3;"></canvas>
+	 <script> /* This script initiates the canvas and puts the text on the canvas "myCanvas" */
+	 var canvas = document.getElementById('myCanvas');
+	 var context = canvas.getContext("2d");
+	 //On a single touch, "draw" function is called and draws a rectangle on the canvas
+	 canvas.addEventListener("touchstart", draw, false);
+
+	 context.font = '20pt Calibri';
+	 context.fillStyle = "black";
+	 context.fillText("Uploaded image will go here", 10, 20);
+	 </script>
+
+	 <br>
+	 <a data-role="button" onClick="analyze();">Analyze</a>
+	 <p id="results"></p>
+	 <br>
+	 <a data-role="button" onClick="reset();">Reset</a>
+
+
+
+	 </div><!-- /content -->
+	 </div><!-- /page -->
+	 </body>
+	</html>
